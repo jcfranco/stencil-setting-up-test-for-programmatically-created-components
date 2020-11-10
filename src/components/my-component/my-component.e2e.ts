@@ -1,32 +1,46 @@
 import { newE2EPage } from '@stencil/core/testing';
 
 describe('my-component', () => {
-  it('renders', async () => {
+  const internalSelector = 'my-component >>> .internal';
+
+  it(`this fails because my-component wiring isn't loaded before the browser script is evaluated`, async () => {
     const page = await newE2EPage();
 
-    await page.setContent('<my-component></my-component>');
-    const element = await page.find('my-component');
-    expect(element).toHaveClass('hydrated');
+    await page.evaluate(() => {
+      const comp = document.createElement('my-component');
+      comp.date = new Date();
+      document.body.append(comp);
+    });
+    await page.waitForChanges();
+
+    const element = await page.find(internalSelector);
+    expect(element).toBeTruthy();
   });
 
-  it('renders changes to the name data', async () => {
-    const page = await newE2EPage();
-
-    await page.setContent('<my-component></my-component>');
-    const component = await page.find('my-component');
-    const element = await page.find('my-component >>> div');
-    expect(element.textContent).toEqual(`Hello, World! I'm `);
-
-    component.setProperty('first', 'James');
+  it('this fails because required props are not passed before rendering', async () => {
+    const page = await newE2EPage({
+      html: '<my-component></my-component>'
+    });
     await page.waitForChanges();
-    expect(element.textContent).toEqual(`Hello, World! I'm James`);
 
-    component.setProperty('last', 'Quincy');
-    await page.waitForChanges();
-    expect(element.textContent).toEqual(`Hello, World! I'm James Quincy`);
+    const element = await page.find(internalSelector);
+    expect(element).toBeTruthy();
+  });
 
-    component.setProperty('middle', 'Earl');
+  it(`this works, but is there a better way?`, async () => {
+    const page = await newE2EPage({
+      // loading unrelated component to do boostrapping
+      html: "<my-unrelated-component></my-unrelated-component>"
+    });
+
+    await page.evaluate(() => {
+      const comp = document.createElement('my-component');
+      comp.date = new Date();
+      document.body.append(comp);
+    });
     await page.waitForChanges();
-    expect(element.textContent).toEqual(`Hello, World! I'm James Earl Quincy`);
+
+    const element = await page.find(internalSelector);
+    expect(element).toBeTruthy();
   });
 });
